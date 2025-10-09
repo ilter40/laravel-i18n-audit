@@ -1,0 +1,46 @@
+# Development files
+.git
+.github
+.vscode
+.idea
+.claude
+*.log
+*.swp
+*.swo
+*~
+
+# Test files
+tests/
+testdata/
+*.test.js
+*.spec.js
+coverage/
+
+CONTRIBUTING.md
+
+# Environment and config
+.env
+.env.*
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Cache and build artifacts
+.i18n-cache.json
+node_modules/
+dist/
+build/
+
+# Git files
+.gitignore
+.gitattributes
+
+# CI/CD
+.travis.yml
+.circleci/
+.gitlab-ci.yml
+
+# Misc
+*.md~
+.DS_Store
+Thumbs.db

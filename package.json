@@ -1,0 +1,56 @@
+{
+  "name": "laravel-i18n-audit",
+  "version": "3.2.5",
+  "description": "Enterprise-grade CLI tool to audit Laravel + Inertia i18n translations with parameter, pluralization, and coverage checks.",
+  "bin": {
+    "laravel-i18n-audit": "index.js"
+  },
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "loaders.js",
+    "scanner.js",
+    "validators.js",
+    "README.md",
+    "LICENSE",
+    ".i18nrc.example.json"
+  ],
+  "keywords": [
+    "laravel",
+    "inertia",
+    "i18n",
+    "translations",
+    "localization",
+    "audit",
+    "checker",
+    "lint",
+    "php",
+    "react",
+    "vue",
+    "translation-validator",
+    "l10n",
+    "internationalization",
+    "multilingual",
+    "pluralization",
+    "ci-cd",
+    "developer-tools"
+  ],
+  "author": "Saleh <Saleh7@protonmail.ch>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Saleh7/laravel-i18n-audit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Saleh7/laravel-i18n-audit/issues"
+  },
+  "homepage": "https://github.com/Saleh7/laravel-i18n-audit#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "node index.js --help",
+    "prepublishOnly": "node index.js --version"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "Welcome back": "Welcome back",
+  "You have :count messages": "You have :count messages",
+  "Hello, :name!": "Hello, :name!",
+  "Your account has been created": "Your account has been created",
+  "Last login: :date at :time": "Last login: :date at :time",
+  "Profile": "Profile",
+  "Settings": "Settings",
+  "Inline usage": "Inline usage",
+  "Another sentence key": "Another sentence key",
+  "Welcome to our site": "Welcome to our site",
+  "Thank you for visiting": "Thank you for visiting",
+  "Your order has been placed": "Your order has been placed",
+  "Order #:id is being processed": "Order #:id is being processed",
+  "Estimated delivery: :date": "Estimated delivery: :date",
+  "All rights reserved": "All rights reserved",
+  "You have one message|You have :count messages": "You have one message|You have :count messages",
+  "There are no items|There is one item|There are :count items": "There are no items|There is one item|There are :count items",
+  "One apple|:count apples": "One apple|:count apples"
+}

@@ -1,0 +1,7 @@
+{
+  "langDir": "lang",
+  "locales": ["en", "ar"],
+  "scanPaths": ["."],
+  "extensions": [".php", ".blade.php", ".tsx", ".jsx", ".vue", ".js", ".ts"],
+  "excludePaths": ["vendor", "node_modules", "storage", "bootstrap/cache", "lang"]
+}

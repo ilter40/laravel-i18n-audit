@@ -1,0 +1,9 @@
+{
+  "Welcome": "Welcome",
+  "auth.failed": "Authentication failed",
+  "You have :count messages": "You have :count messages",
+  "Price: $99": "Price: $99",
+  "Balance: $1,000": "Balance: $1,000",
+  "Total: $1,234.56": "Total: $1,234.56",
+  "Discount: $5 off": "Discount: $5 off"
+}

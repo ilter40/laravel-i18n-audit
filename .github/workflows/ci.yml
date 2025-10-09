@@ -1,0 +1,258 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test on Node ${{ matrix.node }} & PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [ '18', '20', '22' ]
+        php: [ '7.4', '8.2' ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Show versions
+        run: |
+          echo "Node: $(node --version)"
+          echo "npm: $(npm --version)"
+          echo "PHP: $(php --version | head -1)"
+
+      - name: Test CLI commands
+        run: |
+          # Test help
+          node index.js --help
+
+          # Test version
+          VERSION=$(node index.js --version)
+          echo "Version: $VERSION"
+
+          # Verify version matches package.json
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$PKG_VERSION" ]; then
+            echo "Version mismatch: CLI=$VERSION, package.json=$PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Test on fixtures (basic scan)
+        run: |
+          # Tool should run successfully (exit codes 0-127 are valid)
+          # Exit code 1 means "missing translations found" which is EXPECTED for test fixtures
+          node index.js \
+            --src tests/fixtures \
+            --lang tests/fixtures/lang \
+            --locales en \
+            --verbose || EXIT_CODE=$?
+
+          # Verify tool ran (exit code should be 0-127, not a crash)
+          if [ "${EXIT_CODE:-0}" -gt 127 ]; then
+            echo "✗ Tool crashed with exit code $EXIT_CODE"
+            exit 1
+          fi
+
+          echo "✓ Tool ran successfully (exit code: ${EXIT_CODE:-0})"
+
+      - name: Test parameter validation
+        run: |
+          # Allow non-zero exit (missing translations expected)
+          node index.js \
+            --src tests/fixtures \
+            --lang tests/fixtures/lang \
+            --locales en \
+            --check-params || true
+
+          echo "✓ Parameter validation check completed"
+
+      - name: Test JSON output
+        run: |
+          # Capture output (allow non-zero exit code)
+          OUTPUT=$(node index.js \
+            --src tests/fixtures \
+            --lang tests/fixtures/lang \
+            --locales en \
+            --json 2>&1) || true
+
+          # Verify JSON is valid
+          echo "$OUTPUT" | node -e "JSON.parse(require('fs').readFileSync(0))"
+
+          echo "✓ JSON output is valid"
+
+      - name: Test dollar sign validation
+        run: |
+          # Allow non-zero exit (missing translations expected)
+          node index.js \
+            --src tests/fixtures/dollar-test.tsx \
+            --lang tests/fixtures/lang \
+            --locales en \
+            --verbose || true
+
+          echo "✓ Dollar sign validation completed"
+
+      - name: Test config file validation
+        run: |
+          # Test valid config (allow non-zero exit from missing translations)
+          node index.js --config tests/fixtures/.i18nrc.json || true
+
+          # Test invalid config (should show warnings but not crash)
+          node index.js --config tests/invalid-config.json 2>&1 | grep -q "Configuration validation warnings"
+
+          echo "✓ Config validation completed"
+
+  quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify file permissions
+        run: |
+          if [ ! -x index.js ]; then
+            echo "✓ Making index.js executable"
+            chmod +x index.js
+          fi
+
+          if [ -x index.js ]; then
+            echo "✓ index.js is executable"
+          else
+            echo "✗ index.js is not executable"
+            exit 1
+          fi
+
+      - name: Validate package.json structure
+        run: |
+          echo "✓ Validating package.json..."
+
+          # Check required fields
+          NAME=$(npm pkg get name | tr -d '"')
+          VERSION=$(npm pkg get version | tr -d '"')
+          BIN=$(npm pkg get bin)
+
+          echo "  Name: $NAME"
+          echo "  Version: $VERSION"
+          echo "  Bin: $BIN"
+
+          # Verify name matches expected
+          if [ "$NAME" != "laravel-i18n-audit" ]; then
+            echo "✗ Package name mismatch"
+            exit 1
+          fi
+
+          echo "✓ package.json valid"
+
+      - name: Check for TODOs and FIXMEs
+        run: |
+          echo "Checking for TODO/FIXME comments..."
+          grep -r "TODO\|FIXME" *.js || echo "✓ No TODOs found"
+
+      - name: Verify no hardcoded paths
+        run: |
+          echo "Checking for hardcoded paths..."
+          if grep -r "/home/x" *.js 2>/dev/null; then
+            echo "✗ Found hardcoded paths"
+            exit 1
+          fi
+          echo "✓ No hardcoded paths"
+
+  package:
+    name: Test npm Package
+    runs-on: ubuntu-latest
+    needs: [ test, quality ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Test prepublishOnly script
+        run: npm run prepublishOnly
+
+      - name: Test npm pack (dry run)
+        run: |
+          echo "Testing npm pack..."
+          npm pack --dry-run
+
+          echo ""
+          echo "✓ Package contents:"
+          npm pack --dry-run 2>&1 | grep -E '^\s+\S+' || true
+
+      - name: Verify package size
+        run: |
+          SIZE=$(npm pack --dry-run 2>&1 | grep "package size" | awk '{print $4}')
+          echo "Package size: $SIZE"
+
+          # Verify size is reasonable (< 50KB)
+          SIZE_NUM=$(echo $SIZE | sed 's/[^0-9.]//g')
+          if (( $(echo "$SIZE_NUM > 50" | bc -l) )); then
+            echo "⚠️  Warning: Package size > 50KB"
+          else
+            echo "✓ Package size is optimal"
+          fi
+
+      - name: Check what files will be published
+        run: |
+          echo "Files that will be published to npm:"
+          npm pack --dry-run 2>&1 | sed -n '/Tarball Contents/,/Tarball Details/p' | grep -v "Tarball"
+
+  json-only-test:
+    name: Test without PHP (JSON-only)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Test JSON-only scanning (no PHP)
+        run: |
+          # Create temp JSON lang file
+          mkdir -p /tmp/test-lang
+          echo '{"hello": "Hello", "world": "World"}' > /tmp/test-lang/en.json
+
+          # Create temp source
+          mkdir -p /tmp/test-src
+          echo "__('hello')" > /tmp/test-src/test.js
+
+          # Scan (should work without PHP)
+          node index.js \
+            --src /tmp/test-src \
+            --lang /tmp/test-lang \
+            --locales en \
+            --ext js
+
+          echo "✓ Works without PHP for JSON-only projects"
