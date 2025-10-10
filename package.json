@@ -1,6 +1,6 @@
 {
   "name": "laravel-i18n-audit",
-  "version": "3.2.5",
+  "version": "3.3.0",
   "description": "Enterprise-grade CLI tool to audit Laravel + Inertia i18n translations with parameter, pluralization, and coverage checks.",
   "bin": {
     "laravel-i18n-audit": "index.js"
