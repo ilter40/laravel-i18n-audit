@@ -18,7 +18,7 @@ const args = process.argv.slice(2);
 // VERSION AND HELP
 // ============================================================================
 
-const VERSION = '3.2.5';
+const VERSION = '3.3.0';
 
 function showHelp() {
   console.log(`
@@ -68,12 +68,31 @@ EXIT CODES:
 
   Note: Exit codes are combined using bitwise OR when multiple issues exist.
 
+CONFIGURATION FILE (.i18nrc.json):
+  {
+    "locales": ["en", "ar"],
+    "showOrphans": true,
+    "ignoreDomains": ["passwords", "auth", "pagination"],
+    "ignoreKeys": ["specific.key.to.ignore"],
+    "ignorePatterns": ["^validation\\.custom\\."],
+    "checkParams": true,
+    "cache": true
+  }
+
+  Ignore options (v3.3.0+):
+    ignoreDomains   Ignore entire namespaces (e.g., "passwords" ignores "passwords.*")
+    ignoreKeys      Array of exact translation keys to ignore in orphan detection
+    ignorePatterns  Array of regex patterns to match keys to ignore
+
 EXAMPLES:
   # Basic check
   laravel-i18n-audit
 
   # Full audit with all checks
   laravel-i18n-audit --check-params --check-plurals --check-file-duplicates
+
+  # Show orphans (with framework keys ignored via config)
+  laravel-i18n-audit --show-orphans --config .i18nrc.json
 
   # Fast check with caching
   laravel-i18n-audit --cache
@@ -164,7 +183,10 @@ function validateConfig(config, configPath) {
     respectGitignore: 'boolean',
     cache: 'boolean',
     verbose: 'boolean',
-    json: 'boolean'
+    json: 'boolean',
+    ignoreKeys: 'array',      // Exact keys to ignore in orphan detection
+    ignorePatterns: 'array',  // Regex patterns for keys to ignore
+    ignoreDomains: 'array'    // Domain prefixes to ignore (e.g., "passwords" ignores "passwords.*")
   };
 
   // Validate each field
@@ -274,7 +296,10 @@ const CONFIG = {
   RESPECT_GITIGNORE: getArg('--respect-gitignore', configFile.respectGitignore || false),
   JSON_OUTPUT: getArg('--json', configFile.json || false),
   VERBOSE: getArg('--verbose', configFile.verbose || false),
-  CACHE_FILE: path.join(process.cwd(), '.i18n-cache.json')
+  CACHE_FILE: path.join(process.cwd(), '.i18n-cache.json'),
+  IGNORE_KEYS: configFile.ignoreKeys || [],
+  IGNORE_PATTERNS: configFile.ignorePatterns || [],
+  IGNORE_DOMAINS: configFile.ignoreDomains || []
 };
 
 // ============================================================================
@@ -431,7 +456,7 @@ process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 
   if (!CONFIG.JSON_OUTPUT) {
     console.log(ansi.bold(ansi.cyan('\n╔════════════════════════════════════════╗')));
-    console.log(ansi.bold(ansi.cyan('║  i18n Translation Checker v3.2.5 🌍    ║')));
+    console.log(ansi.bold(ansi.cyan('║  i18n Translation Checker v3.3.0 🌍    ║')));
     console.log(ansi.bold(ansi.cyan('╚════════════════════════════════════════╝\n')));
   }
 
@@ -602,7 +627,41 @@ process.on('SIGTERM', () => handleShutdown('SIGTERM'));
     for (const locale of CONFIG.LOCALES) {
       Object.keys(localeMaps[locale] || {}).forEach(k => allLocaleKeys.add(k));
     }
-    orphans = [...allLocaleKeys].filter(k => !usedKeysData.keys.has(k)).sort();
+
+    // Filter function to check if a key should be ignored
+    const shouldIgnoreKey = (key) => {
+      // Check exact key matches
+      if (CONFIG.IGNORE_KEYS.includes(key)) {
+        return true;
+      }
+
+      // Check domain prefixes (e.g., "passwords" matches "passwords.reset", "passwords.token")
+      for (const domain of CONFIG.IGNORE_DOMAINS) {
+        if (key === domain || key.startsWith(domain + '.')) {
+          return true;
+        }
+      }
+
+      // Check regex patterns
+      for (const pattern of CONFIG.IGNORE_PATTERNS) {
+        try {
+          const regex = new RegExp(pattern);
+          if (regex.test(key)) {
+            return true;
+          }
+        } catch (e) {
+          // Invalid regex pattern - log warning in verbose mode
+          verbose(`⚠ Invalid regex pattern in ignorePatterns: ${pattern}`);
+        }
+      }
+
+      return false;
+    };
+
+    orphans = [...allLocaleKeys]
+      .filter(k => !usedKeysData.keys.has(k))
+      .filter(k => !shouldIgnoreKey(k))
+      .sort();
   }
 
   // Calculate coverage

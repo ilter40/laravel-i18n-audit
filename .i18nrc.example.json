@@ -1,24 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
-  "description": "Laravel i18n Audit Configuration - Copy this to .i18nrc.json and customize for your project",
-
   "src": "./",
   "lang": "resources/lang",
   "locales": ["en", "ar"],
+  "extensions": ["php", "blade.php", "ts", "tsx", "js", "jsx", "vue"],
 
-  "extensions": [
-    "php",
-    "blade.php",
-    "ts",
-    "tsx",
-    "js",
-    "jsx",
-    "vue"
-  ],
-
-  "showOrphans": false,
+  "showOrphans": true,
   "failOnOrphans": false,
   "showDuplicates": true,
+
   "checkParams": true,
   "checkPlurals": true,
   "checkFileDuplicates": true,
@@ -26,5 +16,16 @@
 
   "cache": false,
   "verbose": false,
-  "json": false
+  "json": false,
+
+  "ignoreKeys": [
+    "passwords.reset",
+    "passwords.throttled",
+    "passwords.token",
+    "passwords.user"
+  ],
+
+  "ignorePatterns": [],
+
+  "ignoreDomains": []
 }

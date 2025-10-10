@@ -13,6 +13,7 @@ Find missing translations, validate parameters, check pluralization, and detect 
 - ✅ **Detects multiline calls** - no more missed translations
 - ✅ **Validates parameters** - ensures `:name` placeholders match
 - ✅ **Checks pluralization** - verifies plural forms are correct
+- ✅ **Ignores framework keys** - eliminate false positives from Laravel's dynamic translations ⭐ NEW
 - ✅ **Supports all formats** - JSON, PHP arrays, old `array()` syntax
 - ✅ **Works with Laravel 12 + React 19 + Inertia 2** - production tested
 - ✅ **Zero dependencies** - pure Node.js implementation
@@ -31,29 +32,7 @@ laravel-i18n-audit
 
 **That's it!** The tool will scan your code, check translations, and show you what's missing.
 
-## 📊 Example Output
 
-```bash
-╔════════════════════════════════════════╗
-║  i18n Translation Checker v3.2.2 🌍    ║
-╚════════════════════════════════════════╝
-
-📊 SCAN RESULTS
-  Source: ./
-  Locales: en, ar
-  Files scanned: 245
-  Translation keys used: 321
-  Coverage: 100%
-  Duration: 0.37s
-
-✅ No missing translations
-✅ Parity OK (base: en)
-✅ No duplicate keys
-✅ Parameter consistency OK
-✅ Pluralization consistency OK
-
-✨ All checks passed! Your i18n is in great shape.
-```
 
 ## 🎯 Core Features
 
@@ -124,73 +103,7 @@ Uses file modification tracking for blazing-fast repeat checks:
 laravel-i18n-audit --cache
 ```
 
-## 📁 Supported Translation Formats
 
-### 1. JSON Files (`lang/en.json`)
-```json
-{
-  "Welcome back": "Welcome back",
-  "You have :count messages": "You have :count messages"
-}
-```
-
-### 2. PHP Subdirectories (`lang/en/auth.php`)
-```php
-return [
-    'failed' => 'These credentials do not match.',
-    'nested' => [
-        'deep' => 'value'
-    ]
-];
-```
-
-### 3. Single PHP File (`lang/en.php`)
-```php
-return [
-    'welcome' => 'Welcome!',
-    'auth.failed' => 'Login failed'
-];
-```
-
-### 4. Old Array Syntax (since v3.2.2)
-```php
-return array(
-    'key' => array(
-        'nested' => 'value'
-    )
-);
-```
-
-## 🔍 Supported Code Patterns
-
-### PHP & Blade
-```php
-__('auth.failed')
-@lang('Welcome back')
-@choice('You have one item|You have :count items', $count)
-trans_choice('messages.count', 5)
-trans('validation.required')        // ✅ Legacy helper (v3.2.5+)
-Lang::get('users.welcome')         // ✅ Facade call (v3.2.5+)
-```
-
-**Note**: Translation calls in comments are automatically ignored to prevent false positives (v3.2.5+).
-
-### React with Inertia
-```tsx
-import { usePage } from '@inertiajs/react';
-
-function MyComponent() {
-  const { __ } = usePage().props;
-
-  return (
-    <div>
-      <h1>{__('Welcome back')}</h1>
-      <p>{__('auth.failed')}</p>
-      <button>{t('buttons.save')}</button>
-    </div>
-  );
-}
-```
 
 ### Vue with Inertia
 ```vue
@@ -240,11 +153,20 @@ Create `.i18nrc.json` in your project root:
   "checkFileDuplicates": true,
   "respectGitignore": false,
 
+  "ignoreKeys": [],
+  "ignorePatterns": [],
+  "ignoreDomains": [],
+
   "cache": false,
   "verbose": false,
   "json": false
 }
 ```
+
+**Ignore options** (v3.3.0+):
+- `ignoreKeys`: Array of exact translation keys to ignore in orphan detection
+- `ignorePatterns`: Array of regex patterns to match keys to ignore
+- `ignoreDomains`: Array of domain prefixes (e.g., `["passwords"]` ignores all `passwords.*` keys)
 
 </details>
 
@@ -252,6 +174,7 @@ Create `.i18nrc.json` in your project root:
 
 ### Common Options
 ```bash
+--config <path>           Load config from file
 --locales <list>          Languages to check (default: en,ar)
 --src <path>              Directory to scan (default: ./)
 --lang <path>             Translations directory (default: resources/lang)
@@ -272,50 +195,6 @@ Create `.i18nrc.json` in your project root:
 laravel-i18n-audit --help
 ```
 
-## 🔧 CI/CD Integration
-
-### GitHub Actions
-
-```yaml
-name: Check Translations
-
-on: [push, pull_request]
-
-jobs:
-  i18n:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-      - name: Check translations
-        run: |
-          npx laravel-i18n-audit \
-            --check-params \
-            --check-plurals \
-            --json
-```
-
-### Exit Codes
-
-Perfect for CI/CD pipelines - codes combine using bitwise OR:
-
-| Code | Meaning |
-|------|---------|
-| `0` | ✅ All checks passed |
-| `1` | Missing translations |
-| `2` | Language parity issues |
-| `4` | Duplicate keys (across files) |
-| `8` | Parameter mismatches |
-| `16` | Orphaned translations (when `--fail-on-orphans`) |
-| `32` | Pluralization issues |
-| `64` | Duplicate keys (within same file) |
-
-**Example**: Exit code `9` = Missing translations (1) + Parameter mismatches (8)
 
 ## 💡 Usage Examples
 
@@ -368,6 +247,79 @@ laravel-i18n-audit \
 ## 🎯 Advanced Features
 
 <details>
+<summary><b>Ignore Framework Keys</b> ⭐ NEW in v3.3.0</summary>
+
+Laravel's framework uses dynamic translation keys that appear as "orphans" in static analysis. Use ignore features to eliminate false positives:
+
+### Option 1: Ignore by Domain (Simplest)
+
+Ignore entire translation namespaces:
+
+```json
+{
+  "showOrphans": true,
+  "ignoreDomains": ["passwords", "auth", "pagination"]
+}
+```
+
+This ignores:
+- `passwords.*` → `passwords.reset`, `passwords.user`, `passwords.token`, etc.
+- `auth.*` → `auth.failed`, `auth.throttle`, etc.
+- `pagination.*` → `pagination.previous`, `pagination.next`, etc.
+
+### Option 2: Ignore Exact Keys
+
+Specify individual keys to ignore:
+
+```json
+{
+  "showOrphans": true,
+  "ignoreKeys": [
+    "passwords.reset",
+    "passwords.throttled",
+    "passwords.token",
+    "passwords.user"
+  ]
+}
+```
+
+### Option 3: Ignore by Pattern (Advanced)
+
+Use regex patterns for fine-grained control:
+
+```json
+{
+  "showOrphans": true,
+  "ignorePatterns": [
+    "^passwords\\.",
+    "^auth\\.(failed|throttle)$",
+    "^validation\\.custom\\."
+  ]
+}
+```
+
+### Example Configuration
+
+```json
+{
+  "src": "./app",
+  "lang": "./resources/lang",
+  "locales": ["en", "ar"],
+  "showOrphans": true,
+  "ignoreDomains": ["passwords", "auth", "pagination"],
+  "cache": true
+}
+```
+
+**Why these keys appear as orphans:**
+
+Laravel's Password Broker returns status constants like `'passwords.reset'` which are then passed to `__($status)`. Static analysis can't detect this dynamic usage.
+
+See [ORPHAN_KEYS_ANALYSIS_REPORT.md](./ORPHAN_KEYS_ANALYSIS_REPORT.md) for detailed explanation.
+
+</details>
+
+<details>
 <summary><b>Find Unused Translations</b></summary>
 
 Find "orphan" translations defined but never used:
@@ -384,6 +336,8 @@ Output:
   • deprecated.message
   ...
 ```
+
+**Tip:** Use `ignoreDomains` to filter out framework keys (see above).
 
 </details>
 
@@ -432,29 +386,7 @@ Output structure:
 
 </details>
 
-## 🔥 What's New
 
-### v3.2.5 - Enhanced Pattern Detection
-- ✅ Added `trans()` helper detection (legacy Laravel facade)
-- ✅ Added `Lang::get()` facade call detection
-- ✅ Fixed comment false positives (no longer detects keys in // or /* */ comments)
-- ✅ Improved detection accuracy across PHP, JavaScript, and TypeScript
-
-### v3.2.2 - PHP Parser Improvements
-- ✅ Old `array()` syntax support
-- ✅ Proper bracket counting (not just indentation)
-- ✅ Handles single-line arrays correctly
-
-### v3.2.0 - Multiline Support
-- ✅ Detects translation calls spanning up to 3 lines
-- ✅ Sliding window algorithm for accurate detection
-- ✅ Works with all patterns (`__()`, `t()`, JSX, etc.)
-
-### v3.1.6 - .gitignore Support
-- ✅ Respects project .gitignore patterns
-- ✅ Reduces false positives from build artifacts
-
-[See full changelog →](CHANGELOG.md)
 
 ## 📋 Requirements
 
@@ -508,31 +440,12 @@ These directories are already ignored by default:
 
 </details>
 
-## 📚 Resources
 
-- 📖 [Full Documentation](https://github.com/Saleh7/laravel-i18n-audit)
-- 🐛 [Report Issues](https://github.com/Saleh7/laravel-i18n-audit/issues)
-- 💬 [Discussions](https://github.com/Saleh7/laravel-i18n-audit/discussions)
-- 🤝 [Contributing Guide](CONTRIBUTING.md)
 
 ## 🙏 Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 👤 Author
-
-**Saleh** - [Saleh7@protonmail.ch](mailto:Saleh7@protonmail.ch)
-
 ---
 
-<div align="center">
-
-**Made with ❤️ for Laravel and Inertia.js developers**
-
-⭐ Star this repo if it helps your project!
-
-</div>
+<div align="center">⭐ Star this repo if it helps your project!</div>
